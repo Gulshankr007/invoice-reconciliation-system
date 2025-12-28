@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, Depends
+from fastapi import FastAPI, UploadFile, Depends, HTTPException
 from sqlalchemy.orm import Session
 import pandas as pd
 
@@ -42,6 +42,12 @@ async def upload_invoices(
     file: UploadFile,
     db: Session = Depends(get_db)
 ):
+    if file.content_type != "text/csv":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload a CSV file for invoices."
+        )
+
     df = pd.read_csv(file.file)
 
     for _, row in df.iterrows():
@@ -61,6 +67,12 @@ async def upload_payments(
     file: UploadFile,
     db: Session = Depends(get_db)
 ):
+    if file.content_type != "text/csv":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload a CSV file for payments."
+        )
+
     df = pd.read_csv(file.file)
 
     for _, row in df.iterrows():
@@ -84,6 +96,12 @@ def run_reconciliation(db: Session = Depends(get_db)):
 
 @app.post("/test-ocr")
 async def test_ocr(file: UploadFile):
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload a PDF file."
+        )
+
     pdf_bytes = await file.read()
     text = extract_text_from_pdf(pdf_bytes)
     invoices = parse_invoices_from_text(text)
@@ -96,6 +114,12 @@ async def upload_invoice_pdf(
     file: UploadFile,
     db: Session = Depends(get_db)
 ):
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload a PDF invoice."
+        )
+
     pdf_bytes = await file.read()
     text = extract_text_from_pdf(pdf_bytes)
     invoices = parse_invoices_from_text(text)
@@ -118,7 +142,6 @@ async def upload_invoice_pdf(
             saved.append(inv["invoice_number"])
 
     db.commit()
-
     results = run_reconciliation_logic(db)
 
     return {
@@ -133,6 +156,15 @@ async def upload_invoices_excel(
     file: UploadFile,
     db: Session = Depends(get_db)
 ):
+    if file.content_type not in [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel"
+    ]:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload an Excel file."
+        )
+
     df = pd.read_excel(file.file)
     saved = []
 
@@ -166,6 +198,12 @@ async def upload_invoice_text(
     file: UploadFile,
     db: Session = Depends(get_db)
 ):
+    if file.content_type != "text/plain":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload a text (.txt) file."
+        )
+
     text = (await file.read()).decode("utf-8")
     invoices = parse_invoices_from_textfile(text)
 
